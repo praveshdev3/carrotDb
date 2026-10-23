@@ -2,6 +2,7 @@ package core
 
 import (
 	"errors"
+	"fmt"
 )
 
 func Decode(data []byte) (interface{}, error) {
@@ -103,4 +104,31 @@ func decodeArray(data []byte) ([]interface{}, int, error) {
 	}
 
 	return values, pos, nil
+}
+
+func DecodeArrayString(data []byte) ([]string, error) {
+	value, err := Decode(data)
+	if err != nil {
+		return nil, err
+	}
+
+	ts := value.([]interface{})
+	tokens := make([]string, len(ts))
+	for i := range tokens {
+		tokens[i] = ts[i].(string)
+	}
+
+	return tokens, nil
+}
+
+func Encode(value interface{}, isSimpleString bool) []byte {
+	switch v := value.(type) {
+	case string:
+		if isSimpleString {
+			return []byte("+" + v + "\r\n")
+		} else {
+			return []byte("$" + fmt.Sprintf("%d", len(v)) + "\r\n" + v + "\r\n")
+		}
+	}
+	return []byte{}
 }

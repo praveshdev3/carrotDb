@@ -1,11 +1,13 @@
 package server
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"net"
 
 	"github.com/praveshdev3/carrotDb/config"
+	"github.com/praveshdev3/carrotDb/core"
 )
 
 func RunSyncTCPServer() {
@@ -40,29 +42,39 @@ func RunSyncTCPServer() {
 				log.Println("err", err)
 			}
 			log.Println("COMMAND: ", cmd)
-			if err = respond(cmd, conn); err != nil {
-				log.Print("err write:", err)
-			}
+			respond(cmd, conn)
 		}
 	}
 
 }
 
-func readCommand(conn net.Conn) (string, error) {
+func readCommand(conn net.Conn) (*core.RedisCmd, error) {
 	var buf []byte = make([]byte, 1024)
 	n, err := conn.Read(buf)
 	if err != nil {
 		log.Println("Error reading from connection: ", err)
-		return "", err
+		return nil, err
 	}
 
-	return string(buf[:n]), nil
+	tokens, err := core.DecodeArrayString(buf[:n])
+	if err != nil {
+		log.Println("Error decoding command: ", err)
+		return nil, err
+	}
+
+	return &core.RedisCmd{
+		Cmd:  tokens[0],
+		Args: tokens[1:],
+	}, nil
 }
 
-func respond(cmd string, conn net.Conn) error {
-	if _, err := conn.Write([]byte(cmd)); err != nil {
-		log.Println("Error writing to connection: ", err)
-		return err
+func respond(cmd *core.RedisCmd, conn net.Conn) {
+	err := core.Respond(cmd, conn)
+	if err != nil {
+		respondError(err, conn)
 	}
-	return nil
+}
+
+func respondError(err error, conn net.Conn) {
+	conn.Write([]byte(fmt.Sprintf("-%s\r\n", err)))
 }
